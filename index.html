@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PromptDeck — 个人提示词卡片库</title>
+<style>
+:root{
+  --bg:#f4f6f9; --card:#ffffff; --text:#1c2026; --muted:#68727e;
+  --border:#e3e7ec; --accent:#2563eb; --accent-soft:#e3edff;
+  --danger:#dc2626; --star:#eab308; --shadow:0 1px 3px rgba(16,24,40,.08),0 4px 12px rgba(16,24,40,.06);
+  --radius:12px; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+[data-theme="dark"]{
+  --bg:#0f1216; --card:#171c23; --text:#e8ecf1; --muted:#9aa4b2;
+  --border:#28303b; --accent:#5b8cff; --accent-soft:#1c2b4d;
+  --danger:#f87171; --star:#facc15; --shadow:0 1px 3px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;line-height:1.55;transition:background .2s,color .2s}
+header{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--card) 88%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+.topbar{max-width:1100px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-weight:800;font-size:19px;letter-spacing:.3px;white-space:nowrap}
+.logo span{color:var(--accent)}
+.search{flex:1;min-width:180px;display:flex}
+.search input{width:100%;padding:9px 14px;border:1px solid var(--border);border-radius:999px;
+  background:var(--bg);color:var(--text);font-size:14px;outline:none}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:9px;
+  padding:8px 14px;font-size:14px;cursor:pointer;white-space:nowrap;transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.08);color:#fff}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--accent);background:var(--accent-soft)}
+.btn.icon{padding:8px 10px;font-size:16px;line-height:1}
+main{max-width:1100px;margin:0 auto;padding:20px 18px 60px}
+.filterbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.chip{border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:999px;
+  padding:5px 13px;font-size:13px;cursor:pointer;transition:all .15s}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.chip.fav.active{background:var(--star);border-color:var(--star);color:#3a2f00}
+.count{margin-left:auto;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;box-shadow:var(--shadow);cursor:pointer;position:relative;display:flex;flex-direction:column;gap:8px;
+  transition:transform .15s,box-shadow .15s;min-height:150px}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(16,24,40,.12)}
+.card h3{font-size:15.5px;padding-right:30px;line-height:1.4}
+.card .snippet{color:var(--muted);font-size:13px;display:-webkit-box;-webkit-line-clamp:3;
+  -webkit-box-orient:vertical;overflow:hidden;white-space:pre-line}
+.card .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.tag{font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 8px}
+.star{position:absolute;top:10px;right:10px;background:none;border:none;font-size:19px;cursor:pointer;
+  color:var(--border);padding:4px;line-height:1}
+.star.on{color:var(--star)}
+.star:hover{transform:scale(1.15)}
+.varcount{font-size:12px;color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:60px 20px;font-size:15px}
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(10,14,20,.55);display:none;align-items:flex-start;
+  justify-content:center;z-index:50;padding:24px 14px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:640px;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;animation:pop .18s ease-out}
+@keyframes pop{from{transform:translateY(10px) scale(.99);opacity:0}to{transform:none;opacity:1}}
+.modal-head{display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.modal-head h2{font-size:17px;flex:1}
+.modal-body{padding:18px;display:flex;flex-direction:column;gap:14px;max-height:70vh;overflow-y:auto}
+.modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--border);flex-wrap:wrap}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.field input[type=text],.field textarea,.field select{width:100%;padding:10px 12px;border:1px solid var(--border);
+  border-radius:9px;background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;outline:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field textarea{min-height:150px;resize:vertical;font-family:var(--mono);font-size:13.5px;line-height:1.6}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.var-row{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.var-row label{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.var-row input{padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg);
+  color:var(--text);font-size:14px;width:100%;outline:none}
+.var-row input:focus{border-color:var(--accent)}
+.preview{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;
+  font-size:13.5px;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow-y:auto}
+.preview .filled{background:var(--accent-soft);border-radius:4px;padding:0 4px;font-weight:600}
+.preview .unfilled{background:#fef3c7;color:#92400e;border-radius:4px;padding:0 4px;font-family:var(--mono)}
+[data-theme="dark"] .preview .unfilled{background:#453209;color:#fcd34d}
+.section-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.use-tags{display:flex;gap:6px;flex-wrap:wrap}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:#1c2026;color:#fff;
+  padding:10px 20px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:all .25s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.hidden{display:none!important}
+input[type=file].hidden{position:absolute;left:-9999px}
+@media(max-width:640px){
+  .topbar{padding:10px 12px}
+  main{padding:14px 12px 50px}
+  .var-row{grid-template-columns:1fr;gap:4px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="logo">Prompt<span>Deck</span></div>
+    <div class="search"><input id="searchInput" type="text" data-i18n-ph="searchPh" placeholder="搜索标题 / 内容 / 标签…"></div>
+    <button class="btn primary" id="addBtn" data-i18n="add">+ 新建</button>
+    <button class="btn" id="importBtn" data-i18n="import">导入</button>
+    <button class="btn" id="exportBtn" data-i18n="export">导出</button>
+    <button class="btn icon" id="themeBtn" title="theme">◐</button>
+    <button class="btn icon" id="langBtn" title="language">EN</button>
+    <input type="file" id="fileInput" class="hidden" accept=".json,application/json">
+  </div>
+</header>
+<main>
+  <div class="filterbar" id="filterbar">
+    <button class="chip fav" id="favChip" data-i18n="favorites">★ 收藏</button>
+    <span class="count" id="countLabel"></span>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="empty hidden" id="emptyBox" data-i18n="noResults">没有匹配的卡片，换个关键词试试。</div>
+</main>
+
+<div class="overlay" id="useOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="useTitle"></h2>
+      <button class="btn ghost" id="useClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="use-tags" id="useTags"></div>
+      <div id="varSection">
+        <div class="section-title" data-i18n="fillVars">填写变量</div>
+        <div style="height:8px"></div>
+        <div id="varForm" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div>
+        <div class="section-title" data-i18n="preview">预览</div>
+        <div style="height:8px"></div>
+        <div class="preview" id="usePreview"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger" id="useDelete" data-i18n="delete">删除</button>
+      <button class="btn" id="useExportMd" data-i18n="exportMd">导出 MD</button>
+      <button class="btn" id="useEdit" data-i18n="edit">编辑</button>
+      <button class="btn primary" id="useCopy" data-i18n="copy">复制提示词</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="editTitle" data-i18n="newCard">新建卡片</h2>
+      <button class="btn ghost" id="editClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label data-i18n="fTitle">标题</label>
+        <input type="text" id="fTitleInput" maxlength="80">
+      </div>
+      <div class="field">
+        <label data-i18n="fBody">正文（用 {{变量名}} 标记可填变量）</label>
+        <textarea id="fBodyInput"></textarea>
+        <div class="hint" data-i18n="fBodyHint">示例：请把{{文本}}翻译成{{目标语言}}，风格{{风格}}。</div>
+      </div>
+      <div class="field">
+        <label data-i18n="fTags">标签（逗号分隔）</label>
+        <input type="text" id="fTagsInput" data-i18n-ph="fTagsPh" placeholder="写作, 学术">
+      </div>
+      <div class="field">
+        <label data-i18n="fLang">界面语言标记</label>
+        <select id="fLangInput">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="editCancel" data-i18n="cancel">取消</button>
+      <button class="btn primary" id="editSave" data-i18n="save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+/* ============ i18n ============ */
+const I18N = {
+  zh: {
+    searchPh: "搜索标题 / 内容 / 标签…", add: "+ 新建", import: "导入", export: "导出",
+    favorites: "★ 收藏", noResults: "没有匹配的卡片，换个关键词试试。",
+    fillVars: "填写变量", preview: "预览", delete: "删除", exportMd: "导出 MD",
+    edit: "编辑", copy: "复制提示词", copied: "已复制到剪贴板",
+    newCard: "新建卡片", editCard: "编辑卡片", fTitle: "标题", fBody: "正文（用 {{变量名}} 标记可填变量）",
+    fBodyHint: "示例：请把{{文本}}翻译成{{目标语言}}，风格{{风格}}。",
+    fTags: "标签（逗号分隔）", fTagsPh: "写作, 学术", fLang: "内容语言",
+    cancel: "取消", save: "保存", confirmDelete: "确定删除这张卡片吗？",
+    deleted: "已删除", saved: "已保存", imported: "导入 {n} 张卡片", importFail: "导入失败：不是有效的卡片 JSON",
+    exported: "已导出 deck.json", mdExported: "已导出 Markdown", needTitleBody: "标题和正文不能为空",
+    noVars: "这张卡片没有可填变量，可直接复制使用。",
+    count: "共 {n} 张", copyFail: "复制失败，请手动选择复制",
+    allTags: "全部", useCard: "使用", star: "收藏", unstar: "取消收藏"
+  },
+  en: {
+    searchPh: "Search title / body / tags…", add: "+ New", import: "Import", export: "Export",
+    favorites: "★ Starred", noResults: "No matching cards. Try another keyword.",
+    fillVars: "Fill variables", preview: "Preview", delete: "Delete", exportMd: "Export MD",
+    edit: "Edit", copy: "Copy prompt", copied: "Copied to clipboard",
+    newCard: "New card", editCard: "Edit card", fTitle: "Title", fBody: "Body (use {{variable}} for fillable slots)",
+    fBodyHint: "Example: Translate {{text}} into {{language}} in a {{tone}} tone.",
+    fTags: "Tags (comma separated)", fTagsPh: "writing, academic", fLang: "Content language",
+    cancel: "Cancel", save: "Save", confirmDelete: "Delete this card?",
+    deleted: "Deleted", saved: "Saved", imported: "Imported {n} cards", importFail: "Import failed: not valid card JSON",
+    exported: "Exported deck.json", mdExported: "Markdown exported", needTitleBody: "Title and body are required",
+    noVars: "No variables in this card — copy and use directly.",
+    count: "{n} cards", copyFail: "Copy failed, please select and copy manually",
+    allTags: "All", useCard: "Use", star: "Star", unstar: "Unstar"
+  }
+};
+
+/* ============ seed deck: 8 genuinely useful prompts ============ */
+const SEEDS = [
+  {
+    title: "论文润色", tags: ["学术", "写作"], lang: "zh", fav: true,
+    body: "请扮演一位资深学术编辑，润色以下{{论文类型}}的{{段落或全文}}。要求：\n1. 保持原意和学术严谨性，不添加新观点\n2. 修正语法、用词和句式，使表达更地道、简洁\n3. 统一术语译法，前后一致\n4. 语气符合{{期刊风格}}的学术规范\n5. 输出润色后的文本，并在末尾用列表说明主要修改点\n\n原文：\n{{文本}}"
+  },
+  {
+    title: "Code Review", tags: ["code", "engineering"], lang: "en", fav: true,
+    body: "Act as a senior {{language}} engineer doing a thorough code review of the following code. Structure your review as:\n1. **Summary** — what the code does in 2-3 sentences\n2. **Bugs & risks** — correctness issues, edge cases, race conditions\n3. **Performance** — complexity concerns, obvious wins\n4. **Readability** — naming, structure, comments\n5. **Suggestions** — concrete refactored snippets where valuable\nBe direct and specific; skip praise unless earned. Tag each issue critical / major / minor.\n\nCode:\n{{code}}"
+  },
+  {
+    title: "旅行规划", tags: ["旅行", "生活"], lang: "zh", fav: false,
+    body: "请为我规划一份{{天数}}天的{{目的地}}旅行行程。\n出行信息：\n- 出行人数：{{人数}}，同行人：{{同行人}}\n- 预算：{{预算}}（{{货币}}）\n- 偏好：{{偏好}}（如美食 / 自然 / 人文 / 购物）\n- 出行日期：{{日期}}\n- 住宿偏好：{{住宿偏好}}\n\n要求：\n1. 按天列出上午 / 下午 / 晚上安排，标注每处预计停留时间和交通方式\n2. 推荐 3 家当地特色餐厅并说明招牌菜和人均消费\n3. 给出每日预算分配，并判断总预算是否超支\n4. 提醒签证、天气、当地习俗等注意事项"
+  },
+  {
+    title: "SQL Generator", tags: ["sql", "data"], lang: "en", fav: false,
+    body: "You are a SQL expert. Generate a {{dialect}} query for the following request.\n\nSchema:\n{{schema}}\n\nRequest: {{request}}\n\nRules:\n1. Use only tables and columns from the schema above — never invent columns\n2. Prefer explicit JOINs over subqueries where readable\n3. Add brief comments for non-obvious logic\n4. Output the SQL in a code block, then a one-paragraph explanation of how it works\n5. If the request is ambiguous, state your assumption before the SQL"
+  },
+  {
+    title: "写作扩写", tags: ["写作", "内容"], lang: "zh", fav: false,
+    body: "请将以下写作大纲扩写成一篇约{{字数}}字的{{文体}}。\n\n要求：\n1. 保留大纲的全部要点和逻辑顺序，可适当补充过渡\n2. 语言风格：{{风格}}（如平实 / 幽默 / 正式）\n3. 开头要有钩子，结尾要有收束或升华\n4. 避免车轱辘话，每段只讲一个意思\n5. 目标读者：{{读者}}\n\n大纲：\n{{大纲}}"
+  },
+  {
+    title: "翻译校对", tags: ["翻译", "写作"], lang: "zh", fav: false,
+    body: "请校对以下{{源语言}}到{{目标语言}}的翻译。\n\n要求：\n1. 逐句检查：忠实原文，无漏译误译\n2. 标出机器翻译腔（生硬直译、语序问题），给出更地道的改法\n3. 统一专有名词和术语译法\n4. 数字、日期、单位格式符合目标语言习惯\n5. 输出格式：先给修改后的全文，再用列表逐条说明「原译 → 建议改法 → 原因」\n\n原文：\n{{原文}}\n\n译文：\n{{译文}}"
+  },
+  {
+    title: "面试准备", tags: ["求职", "面试"], lang: "zh", fav: false,
+    body: "请扮演{{公司}}的{{岗位}}面试官，对我进行模拟面试。\n\n规则：\n1. 一次只问一个问题，等我回答后再继续\n2. 问题循序渐进：从自我介绍和项目深挖开始，逐步深入到{{侧重方向}}（如系统设计 / 算法 / 业务理解）\n3. 每个问题后对我的回答做简短点评（优点 + 一个可改进点），再出下一题\n4. 共进行{{轮数}}轮，最后给出总体评价和录用建议（强推 / 可谈 / 挂掉）及理由\n5. 全程用{{语言}}进行\n\n我的背景：\n{{背景}}"
+  },
+  {
+    title: "Regex Explainer", tags: ["code", "regex"], lang: "en", fav: false,
+    body: "Explain the following regular expression in plain {{language}} as if teaching a beginner who knows basic programming but not regex.\n\nRegex: {{regex}}\n\nStructure:\n1. **Plain-English summary** — what strings it matches, in one sentence\n2. **Piece by piece** — break it into tokens and groups, explain each with a tiny example\n3. **Match / no-match examples** — 3 strings it matches, 3 it doesn't, and why\n4. **Common pitfalls** — catastrophic backtracking risks, greedy vs lazy issues, escaping gotchas\n5. **Simpler alternative** — if one exists, show it"
+  }
+];
+
+/* ============ state & storage ============ */
+const LS_KEY = "promptdeck.v1";
+let deck = [];
+let uiLang = "zh";
+let theme = "light";
+let searchQ = "";
+let activeTag = null;
+let favOnly = false;
+let useCardId = null;
+let editCardId = null;
+let editReturnToUse = false;
+let varValues = {};
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function save() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({ deck, uiLang, theme }));
+  } catch (e) { /* storage full or blocked: keep in-memory */ }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (Array.isArray(d.deck)) {
+        deck = d.deck.filter(validCard);
+        uiLang = d.uiLang === "en" ? "en" : "zh";
+        theme = d.theme === "dark" ? "dark" : "light";
+        return;
+      }
+    }
+  } catch (e) { /* corrupted: reseed below */ }
+  deck = SEEDS.map(s => ({
+    id: uid(), title: s.title, body: s.body,
+    tags: s.tags.slice(), fav: !!s.fav, lang: s.lang,
+    createdAt: Date.now(), updatedAt: Date.now()
+  }));
+  save();
+}
+function validCard(c) {
+  return c && typeof c.id === "string" && typeof c.title === "string" && typeof c.body === "string";
+}
+function t(key, params) {
+  let s = (I18N[uiLang] && I18N[uiLang][key]) || I18N.en[key] || key;
+  if (params) for (const k in params) s = s.replace("{" + k + "}", params[k]);
+  return s;
+}
+
+/* ============ utils ============ */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+// Extract unique {{variable}} names in order of first appearance.
+// Ignores malformed "{{" without a closing "}}".
+function extractVars(body) {
+  const vars = [];
+  const seen = new Set();
+  const re = /\{\{([^{}]+)\}\}/g;
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    const name = m[1].trim();
+    if (name && !seen.has(name)) { seen.add(name); vars.push(name); }
+  }
+  return vars;
+}
+function renderPreview(body, values) {
+  return escapeHtml(body).replace(/\{\{([^{}]+)\}\}/g, (full, inner) => {
+    const name = inner.trim();
+    const v = values[name];
+    if (v !== undefined && v !== "") {
+      return '<span class="filled">' + escapeHtml(v) + "</span>";
+    }
+    return '<span class="unfilled">{{' + escapeHtml(name) + "}}</span>";
+  });
+}
+function renderPlain(body, values) {
+  return body.replace(/\{\{([^{}]+)\}\}/g, (full, inner) => {
+    const name = inner.trim();
+    const v = values[name];
+    return (v !== undefined && v !== "") ? v : full;
+  });
+}
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toast._h);
+  toast._h = setTimeout(() => el.classList.remove("show"), 1800);
+}
+function copyText(text, okMsg) {
+  const done = () => toast(okMsg || t("copied"));
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); }
+  catch (e) { toast(t("copyFail")); }
+  document.body.removeChild(ta);
+}
+function download(filename, content, mime) {
+  const blob = new Blob([content], { type: mime || "application/octet-stream" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function getCard(id) { return deck.find(c => c.id === id); }
+function allTags() {
+  const s = new Set();
+  deck.forEach(c => (c.tags || []).forEach(tag => s.add(tag)));
+  return Array.from(s).sort();
+}
+/* ============ rendering ============ */
+function filteredDeck() {
+  const q = searchQ.trim().toLowerCase();
+  return deck.filter(c => {
+    if (favOnly && !c.fav) return false;
+    if (activeTag && !(c.tags || []).includes(activeTag)) return false;
+    if (q) {
+      const hay = (c.title + "\n" + c.body + "\n" + (c.tags || []).join(" ")).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a, b) => ((b.fav ? 1 : 0) - (a.fav ? 1 : 0)) || (b.updatedAt - a.updatedAt));
+}
+function render() {
+  renderFilters();
+  const grid = document.getElementById("grid");
+  const list = filteredDeck();
+  document.getElementById("emptyBox").classList.toggle("hidden", list.length > 0);
+  document.getElementById("countLabel").textContent = t("count", { n: list.length });
+  grid.innerHTML = list.map(c => {
+    const vars = extractVars(c.body);
+    const tags = (c.tags || []).map(x => '<span class="tag">' + escapeHtml(x) + "</span>").join("");
+    return '<div class="card" data-id="' + c.id + '">' +
+      '<button class="star' + (c.fav ? " on" : "") + '" data-star="' + c.id + '" title="' + escapeHtml(t(c.fav ? "unstar" : "star")) + '">★</button>' +
+      "<h3>" + escapeHtml(c.title) + "</h3>" +
+      '<div class="snippet">' + escapeHtml(c.body.slice(0, 140)) + (c.body.length > 140 ? "…" : "") + "</div>" +
+      '<div class="varcount">' + vars.length + " vars · " + escapeHtml(c.lang === "en" ? "EN" : "中文") + "</div>" +
+      '<div class="tags">' + tags + "</div>" +
+      "</div>";
+  }).join("");
+}
+function renderFilters() {
+  const bar = document.getElementById("filterbar");
+  const tags = allTags();
+  const chips = tags.map(tag =>
+    '<button class="chip' + (activeTag === tag ? " active" : "") + '" data-tag="' + escapeHtml(tag) + '">' +
+    escapeHtml(tag) + "</button>").join("");
+  bar.innerHTML =
+    '<button class="chip fav' + (favOnly ? " active" : "") + '" id="favChip">' + escapeHtml(t("favorites")) + "</button>" +
+    (tags.length ? '<button class="chip' + (activeTag === null ? " active" : "") + '" data-tag="">' + escapeHtml(t("allTags")) + "</button>" + chips
+                 : "") +
+    '<span class="count" id="countLabel"></span>';
+}
+
+/* ============ use view ============ */
+function openUse(id) {
+  const c = getCard(id);
+  if (!c) return;
+  useCardId = id;
+  varValues = {};
+  document.getElementById("useTitle").textContent = c.title;
+  document.getElementById("useTags").innerHTML =
+    (c.tags || []).map(x => '<span class="tag">' + escapeHtml(x) + "</span>").join("");
+  const vars = extractVars(c.body);
+  const vs = document.getElementById("varSection");
+  const form = document.getElementById("varForm");
+  if (vars.length === 0) {
+    vs.querySelector(".section-title").textContent = t("noVars");
+    form.innerHTML = "";
+  } else {
+    vs.querySelector(".section-title").textContent = t("fillVars");
+    form.innerHTML = vars.map(v =>
+      '<div class="var-row"><label title="' + escapeHtml(v) + '">{{' + escapeHtml(v) + "}}</label>" +
+      '<input type="text" data-var="' + escapeHtml(v) + '" placeholder="{{' + escapeHtml(v) + '}}"></div>'
+    ).join("");
+  }
+  updatePreview();
+  document.getElementById("useOverlay").classList.add("open");
+}
+function updatePreview() {
+  const c = getCard(useCardId);
+  if (!c) return;
+  document.getElementById("usePreview").innerHTML = renderPreview(c.body, varValues);
+}
+function closeUse() {
+  document.getElementById("useOverlay").classList.remove("open");
+  useCardId = null;
+}
+
+/* ============ editor ============ */
+function openEditor(id) {
+  editCardId = id || null;
+  const c = id ? getCard(id) : null;
+  document.getElementById("editTitle").textContent = t(c ? "editCard" : "newCard");
+  document.getElementById("fTitleInput").value = c ? c.title : "";
+  document.getElementById("fBodyInput").value = c ? c.body : "";
+  document.getElementById("fTagsInput").value = c ? (c.tags || []).join(", ") : "";
+  document.getElementById("fLangInput").value = c ? c.lang : (uiLang === "en" ? "en" : "zh");
+  document.getElementById("editOverlay").classList.add("open");
+  setTimeout(() => document.getElementById("fTitleInput").focus(), 60);
+}
+function closeEditor() {
+  document.getElementById("editOverlay").classList.remove("open");
+  editCardId = null;
+  editReturnToUse = false;
+}
+function saveEditor() {
+  const title = document.getElementById("fTitleInput").value.trim();
+  const body = document.getElementById("fBodyInput").value.trim();
+  if (!title || !body) { toast(t("needTitleBody")); return; }
+  const tags = document.getElementById("fTagsInput").value.split(",")
+    .map(s => s.trim()).filter(Boolean).slice(0, 12);
+  const lang = document.getElementById("fLangInput").value;
+  const editedId = editCardId;
+  const reopenUse = editReturnToUse;
+  if (editedId) {
+    const c = getCard(editedId);
+    if (c) { c.title = title; c.body = body; c.tags = tags; c.lang = lang; c.updatedAt = Date.now(); }
+  } else {
+    deck.push({ id: uid(), title, body, tags, fav: false, lang, createdAt: Date.now(), updatedAt: Date.now() });
+  }
+  save(); render(); closeEditor();
+  toast(t("saved"));
+  if (reopenUse && editedId) openUse(editedId);
+}
+
+/* ============ import / export ============ */
+function exportDeck() {
+  download("promptdeck.json",
+    JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), prompts: deck }, null, 2),
+    "application/json");
+  toast(t("exported"));
+}
+function importDeck(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      const arr = Array.isArray(d) ? d : d.prompts;
+      if (!Array.isArray(arr)) throw new Error("bad shape");
+      const ids = new Set(deck.map(c => c.id));
+      let n = 0;
+      arr.forEach(c => {
+        if (!validCard(c)) return;
+        const card = {
+          id: ids.has(c.id) ? uid() : c.id,
+          title: String(c.title).slice(0, 120),
+          body: String(c.body),
+          tags: Array.isArray(c.tags) ? c.tags.map(String).slice(0, 12) : [],
+          fav: !!c.fav, lang: c.lang === "en" ? "en" : "zh",
+          createdAt: c.createdAt || Date.now(), updatedAt: Date.now()
+        };
+        ids.add(card.id);
+        deck.push(card);
+        n++;
+      });
+      save(); render();
+      toast(t("imported", { n }));
+    } catch (e) { toast(t("importFail")); }
+  };
+  r.readAsText(file);
+}
+function exportCardMd(id) {
+  const c = getCard(id);
+  if (!c) return;
+  const md = "# " + c.title + "\n\n" +
+    ((c.tags || []).length ? "> tags: " + c.tags.join(", ") + "\n\n" : "") +
+    "```\n" + c.body + "\n```\n";
+  const safe = c.title.replace(/[^\w\u4e00-\u9fff-]+/g, "_").slice(0, 40) || "prompt";
+  download(safe + ".md", md, "text/markdown");
+  toast(t("mdExported"));
+}
+
+/* ============ i18n / theme ============ */
+function applyI18n() {
+  document.documentElement.lang = uiLang === "en" ? "en" : "zh-CN";
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  document.getElementById("langBtn").textContent = uiLang === "en" ? "中文" : "EN";
+  document.title = uiLang === "en" ? "PromptDeck — personal prompt card library" : "PromptDeck — 个人提示词卡片库";
+  render();
+}
+function applyTheme() {
+  document.documentElement.dataset.theme = theme;
+}
+
+/* ============ events ============ */
+function bind() {
+  document.getElementById("searchInput").addEventListener("input", e => {
+    searchQ = e.target.value; render();
+  });
+  document.getElementById("filterbar").addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    if (chip.id === "favChip") { favOnly = !favOnly; }
+    else { activeTag = chip.dataset.tag || null; }
+    render();
+  });
+  document.getElementById("grid").addEventListener("click", e => {
+    const star = e.target.closest("[data-star]");
+    if (star) {
+      e.stopPropagation();
+      const c = getCard(star.dataset.star);
+      if (c) { c.fav = !c.fav; c.updatedAt = Date.now(); save(); render(); }
+      return;
+    }
+    const card = e.target.closest(".card");
+    if (card) openUse(card.dataset.id);
+  });
+  document.getElementById("addBtn").addEventListener("click", () => openEditor(null));
+  document.getElementById("importBtn").addEventListener("click", () => document.getElementById("fileInput").click());
+  document.getElementById("fileInput").addEventListener("change", e => {
+    if (e.target.files[0]) importDeck(e.target.files[0]);
+    e.target.value = "";
+  });
+  document.getElementById("exportBtn").addEventListener("click", exportDeck);
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    theme = theme === "dark" ? "light" : "dark"; applyTheme(); save();
+  });
+  document.getElementById("langBtn").addEventListener("click", () => {
+    uiLang = uiLang === "en" ? "zh" : "en"; applyI18n(); save();
+  });
+  // use modal
+  document.getElementById("useClose").addEventListener("click", closeUse);
+  document.getElementById("useOverlay").addEventListener("click", e => {
+    if (e.target.id === "useOverlay") closeUse();
+  });
+  document.getElementById("varForm").addEventListener("input", e => {
+    const inp = e.target.closest("[data-var]");
+    if (inp) { varValues[inp.dataset.var] = inp.value; updatePreview(); }
+  });
+  document.getElementById("useCopy").addEventListener("click", () => {
+    const c = getCard(useCardId);
+    if (c) copyText(renderPlain(c.body, varValues));
+  });
+  document.getElementById("useEdit").addEventListener("click", () => {
+    const id = useCardId;
+    editReturnToUse = true;
+    closeUse();
+    openEditor(id);
+  });
+  document.getElementById("useDelete").addEventListener("click", () => {
+    if (!useCardId || !confirm(t("confirmDelete"))) return;
+    deck = deck.filter(c => c.id !== useCardId);
+    save(); render(); closeUse(); toast(t("deleted"));
+  });
+  document.getElementById("useExportMd").addEventListener("click", () => exportCardMd(useCardId));
+  // edit modal
+  document.getElementById("editClose").addEventListener("click", closeEditor);
+  document.getElementById("editCancel").addEventListener("click", closeEditor);
+  document.getElementById("editOverlay").addEventListener("click", e => {
+    if (e.target.id === "editOverlay") closeEditor();
+  });
+  document.getElementById("editSave").addEventListener("click", saveEditor);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { closeUse(); closeEditor(); }
+  });
+}
+
+/* ============ init ============ */
+load();
+applyTheme();
+applyI18n();
+bind();
+</script>
+</body>
+</html>
